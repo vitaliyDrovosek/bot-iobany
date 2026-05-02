@@ -5,7 +5,6 @@ from datetime import datetime
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message
 from aiogram.filters import Command
-from config import TOKEN
 
 # ========== ЗАГРУЗКА БАНВОРДОВ ИЗ JSON ==========
 def load_banwords():
@@ -25,7 +24,7 @@ def load_banwords():
         return []
 
 # ========== НАСТРОЙКИ ==========
-BOT_TOKEN = TOKEN
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 FORBIDDEN_WORDS = load_banwords()
 deleted_counter = 0
 
