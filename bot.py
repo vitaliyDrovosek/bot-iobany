@@ -25,11 +25,8 @@ def load_banwords():
         return []
 
 # ========== НАСТРОЙКИ ==========
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-if not BOT_TOKEN:
-    print("ОШИБКА: Не задана переменная окружения BOT_TOKEN")
-    exit(1)
+BOT_TOKEN = "8638319855:AAEm2XGIRE-6Koo6ULo-_o51zgUCMySYrvM"
+# не трогать суки
 
 FORBIDDEN_WORDS = load_banwords()
 deleted_counter = 0
