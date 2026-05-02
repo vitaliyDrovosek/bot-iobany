@@ -110,7 +110,7 @@ async def handle_text(message: Message):
     
     await message.delete()
     deleted_counter += 1
-    await message.answer("Вы забыли прикрепить картинку")
+    await message.answer(f"{message.from_user.first_name}, вы забыли прикрепить картинку")
     print(f"Deleted text from {message.from_user.first_name} | Total: {deleted_counter}")
 
 @dp.message(F.photo & F.caption)
