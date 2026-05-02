@@ -1,3 +1,4 @@
+import os
 import asyncio
 import json
 import re
@@ -25,6 +26,11 @@ def load_banwords():
 
 # ========== НАСТРОЙКИ ==========
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+if not BOT_TOKEN:
+    print("ОШИБКА: Не задана переменная окружения BOT_TOKEN")
+    exit(1)
+
 FORBIDDEN_WORDS = load_banwords()
 deleted_counter = 0
 
@@ -45,9 +51,8 @@ def contains_forbidden(text: str) -> bool:
             return True
     return False
 
-# ========== СНАЧАЛА КОМАНДЫ ==========
+# ========== КОМАНДЫ ==========
 
-# 1. Команда /start
 @dp.message(Command("start"))
 async def start_command(message: Message):
     await message.answer(
@@ -61,7 +66,6 @@ async def start_command(message: Message):
         f"Loaded {len(FORBIDDEN_WORDS)} forbidden words"
     )
 
-# 2. Команда /stats
 @dp.message(Command("stats"))
 async def stats_command(message: Message):
     global deleted_counter
@@ -73,7 +77,6 @@ async def stats_command(message: Message):
         await message.answer("Sending statistics to private chat...")
         await bot.send_message(message.from_user.id, text)
 
-# 3. Команда /reload (только для админов)
 @dp.message(Command("reload"))
 async def reload_banwords(message: Message):
     global FORBIDDEN_WORDS
@@ -99,14 +102,12 @@ async def reload_banwords(message: Message):
     else:
         await message.answer("Failed to reload banwords. Check banwords.json file")
 
-# ========== ПОТОМ ВСЁ ОСТАЛЬНОЕ ==========
+# ========== УДАЛЕНИЕ СООБЩЕНИЙ ==========
 
-# 4. ЛЮБЫЕ текстовые сообщения (не команды) -> удаляем и пишем
 @dp.message(F.text)
 async def handle_text(message: Message):
     global deleted_counter
     
-    # Пропускаем, если это команда (начинается с /)
     if message.text.startswith('/'):
         return
     
@@ -115,7 +116,6 @@ async def handle_text(message: Message):
     await message.answer("Вы забыли прикрепить картинку")
     print(f"Deleted text from {message.from_user.first_name} | Total: {deleted_counter}")
 
-# 5. Фото с подписью
 @dp.message(F.photo & F.caption)
 async def handle_photo_with_caption(message: Message):
     global deleted_counter
@@ -128,12 +128,10 @@ async def handle_photo_with_caption(message: Message):
         deleted_counter += 1
         print(f"Deleted photo with bad caption from {message.from_user.first_name} | Total: {deleted_counter}")
 
-# 6. Фото без подписи - ничего не делаем
 @dp.message(F.photo & ~F.caption)
 async def handle_photo_without_caption(message: Message):
     pass
 
-# 7. Видео, документы с подписью
 @dp.message((F.video | F.document | F.audio | F.voice) & F.caption)
 async def handle_media_with_caption(message: Message):
     global deleted_counter
