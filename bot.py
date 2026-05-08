@@ -18,20 +18,19 @@ def load_banwords():
             all_words = [word.lower() for word in all_words]
             return all_words
     except FileNotFoundError:
-        print("ERROR: banwords.json not found")
+        print("ОШИБКА: banwords.json не найден")
         return []
     except json.JSONDecodeError:
-        print("ERROR: Invalid JSON format")
+        print("ОШИБКА: Неверный формат JSON")
         return []
 
 # ========== НАСТРОЙКИ ==========
 BOT_TOKEN = "8638319855:AAEm2XGIRE-6Koo6ULo-_o51zgUCMySYrvM"
-# не трогать суки
 
 FORBIDDEN_WORDS = load_banwords()
 deleted_counter = 0
 
-print(f"Loaded {len(FORBIDDEN_WORDS)} forbidden words")
+print(f"Загружено {len(FORBIDDEN_WORDS)} запрещенных слов")
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -48,56 +47,68 @@ def contains_forbidden(text: str) -> bool:
             return True
     return False
 
+async def is_admin(message: Message) -> bool:
+    """Проверяет, является ли пользователь администратором"""
+    if message.chat.type == "private":
+        return True
+    
+    try:
+        chat_member = await bot.get_chat_member(message.chat.id, message.from_user.id)
+        return chat_member.status in ["creator", "administrator"]
+    except:
+        return False
+
+async def delete_message_later(chat_id: int, message_id: int, delay: int = 60):
+    """Удаляет сообщение через указанное количество секунд"""
+    await asyncio.sleep(delay)
+    try:
+        await bot.delete_message(chat_id, message_id)
+    except:
+        pass
+
 # ========== КОМАНДЫ ==========
 
 @dp.message(Command("start"))
 async def start_command(message: Message):
     await message.answer(
-        f"Bot started\n\n"
-        f"What I do:\n"
-        f"1. ANY text message (except commands) -> delete and reply 'You forgot to attach an image'\n"
-        f"2. Photo with forbidden words in caption -> delete (silent)\n"
-        f"3. Commands are IGNORED\n\n"
-        f"Statistics: /stats\n"
-        f"Reload banwords: /reload (admins only)\n\n"
-        f"Loaded {len(FORBIDDEN_WORDS)} forbidden words"
+        f"Бот запущен\n\n"
+        f"Что я делаю:\n"
+        f"1. Любое текстовое сообщение от не-админов -> удаляю и пишу 'Забыл прикрепить картинку' (сообщение удалится через минуту)\n"
+        f"2. Фото или видео с запрещенными словами в подписи от не-админов -> удаляю молча\n"
+        f"3. Администраторы полностью игнорируются\n"
+        f"4. Команды игнорируются\n\n"
+        f"Статистика: /stats\n"
+        f"Перезагрузить банворды: /reload (только админы)\n\n"
+        f"Загружено {len(FORBIDDEN_WORDS)} запрещенных слов"
     )
 
 @dp.message(Command("stats"))
 async def stats_command(message: Message):
     global deleted_counter
-    text = f"Statistics\n\nDeleted messages: {deleted_counter}\nForbidden words: {len(FORBIDDEN_WORDS)}\nSince: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}"
+    text = f"Статистика\n\nУдалено сообщений: {deleted_counter}\nЗапрещенных слов: {len(FORBIDDEN_WORDS)}\nС {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}"
     
     if message.chat.type == "private":
         await message.answer(text)
     else:
-        await message.answer("Sending statistics to private chat...")
+        await message.answer("Отправляю статистику в личные сообщения")
         await bot.send_message(message.from_user.id, text)
 
 @dp.message(Command("reload"))
 async def reload_banwords(message: Message):
     global FORBIDDEN_WORDS
     
-    if message.chat.type == "private":
-        await message.answer("This command works only in groups")
-        return
-    
-    try:
-        chat_member = await bot.get_chat_member(message.chat.id, message.from_user.id)
-        if chat_member.status not in ["creator", "administrator"]:
-            await message.answer("Only administrators can reload banwords")
-            return
-    except:
-        await message.answer("Failed to check user permissions")
+    # Только для админов
+    if not await is_admin(message):
+        await message.answer("Только администраторы могут перезагружать банворды")
         return
     
     new_words = load_banwords()
     if new_words:
         FORBIDDEN_WORDS = new_words
-        await message.answer(f"Banwords reloaded! Loaded {len(FORBIDDEN_WORDS)} words")
-        print(f"Banwords reloaded by {message.from_user.first_name}")
+        await message.answer(f"Банворды перезагружены! Загружено {len(FORBIDDEN_WORDS)} слов")
+        print(f"Банворды перезагружены админом {message.from_user.first_name}")
     else:
-        await message.answer("Failed to reload banwords. Check banwords.json file")
+        await message.answer("Не удалось перезагрузить банворды. Проверьте файл banwords.json")
 
 # ========== УДАЛЕНИЕ СООБЩЕНИЙ ==========
 
@@ -105,47 +116,70 @@ async def reload_banwords(message: Message):
 async def handle_text(message: Message):
     global deleted_counter
     
+    # Пропускаем команды
     if message.text.startswith('/'):
         return
     
+    # Пропускаем админов
+    if await is_admin(message):
+        return
+    
+    # Удаляем сообщение
     await message.delete()
     deleted_counter += 1
-    await message.answer(f"{message.from_user.first_name}, вы забыли прикрепить картинку")
-    print(f"Deleted text from {message.from_user.first_name} | Total: {deleted_counter}")
+    
+    # Отправляем ответ и удаляем его через минуту
+    msg = await message.answer(f"{message.from_user.first_name}, вы забыли прикрепить картинку")
+    asyncio.create_task(delete_message_later(msg.chat.id, msg.message_id, 60))
+    
+    print(f"Удален текст от {message.from_user.first_name} | Всего: {deleted_counter}")
 
 @dp.message(F.photo & F.caption)
 async def handle_photo_with_caption(message: Message):
     global deleted_counter
     
+    # Пропускаем команды
     if message.caption.startswith('/'):
         return
     
+    # Пропускаем админов
+    if await is_admin(message):
+        return
+    
+    # Проверяем наличие запрещенных слов
     if contains_forbidden(message.caption):
         await message.delete()
         deleted_counter += 1
-        print(f"Deleted photo with bad caption from {message.from_user.first_name} | Total: {deleted_counter}")
+        print(f"Удалено фото с плохой подписью от {message.from_user.first_name} | Всего: {deleted_counter}")
 
 @dp.message(F.photo & ~F.caption)
 async def handle_photo_without_caption(message: Message):
+    # Фото без подписи - ничего не делаем
     pass
 
 @dp.message((F.video | F.document | F.audio | F.voice) & F.caption)
 async def handle_media_with_caption(message: Message):
     global deleted_counter
     
+    # Пропускаем команды
     if message.caption.startswith('/'):
         return
     
+    # Пропускаем админов
+    if await is_admin(message):
+        return
+    
+    # Проверяем наличие запрещенных слов
     if contains_forbidden(message.caption):
         await message.delete()
         deleted_counter += 1
-        print(f"Deleted media with bad caption from {message.from_user.first_name} | Total: {deleted_counter}")
+        print(f"Удален медиафайл с плохой подписью от {message.from_user.first_name} | Всего: {deleted_counter}")
 
 # ========== ЗАПУСК ==========
 async def main():
-    print("Bot started")
-    print(f"Loaded {len(FORBIDDEN_WORDS)} forbidden words")
-    print("Commands /start, /stats, /reload work")
+    print("Бот запущен")
+    print(f"Загружено {len(FORBIDDEN_WORDS)} запрещенных слов")
+    print("Команды: /start, /stats, /reload")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
