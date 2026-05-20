@@ -1,3 +1,4 @@
+import os
 import asyncio
 import json
 import re
@@ -9,7 +10,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 
-BOT_TOKEN = "8638319855:AAEm2XGIRE-6Koo6ULo-_o51zgUCMySYrvM"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 
 class ModerationBot:
