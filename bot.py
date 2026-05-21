@@ -10,7 +10,7 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = "8605851489:AAGFXGDVNAknWiIg_NP0ZGT3JtfHOM9sdrA"
 
 
 class ModerationBot:
