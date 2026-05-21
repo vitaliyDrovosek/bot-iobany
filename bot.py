@@ -12,6 +12,12 @@ from aiogram.types import Message
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
+print(f"DEBUG: BOT_TOKEN = {BOT_TOKEN[:20]}..." if BOT_TOKEN else "DEBUG: BOT_TOKEN = None")
+
+if not BOT_TOKEN:
+    print("Токен не найден")
+    print("Доступные переменные:", list(os.environ.keys()))
+    exit(1)
 
 class ModerationBot:
 
